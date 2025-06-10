@@ -1,16 +1,23 @@
+// Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
+// import { getAnalytics } from "firebase/analytics"; // Analytics can be added if needed
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-// TODO: Replace with your actual Firebase project configuration
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyBZiL44IHw57bbKvA3FSuC7-kjNPwDDg4E",
+  authDomain: "pixel-art-generator-3071a.firebaseapp.com",
+  projectId: "pixel-art-generator-3071a",
+  storageBucket: "pixel-art-generator-3071a.appspot.com", // Corrected storage bucket domain
+  messagingSenderId: "762846537877",
+  appId: "1:762846537877:web:eedc0ccdaa613e55b9939c",
+  measurementId: "G-JFK5SW62ER"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+// const analytics = getAnalytics(app); // Analytics can be initialized if needed
 
 export { app, firebaseConfig }; // Export the initialized app and the config

@@ -1,23 +1,7 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { generatePixelArtImage } from './services/geminiService';
-import { useAuth } from './contexts/AuthContext';
-import LoginPage from './components/auth/LoginPage';
-import SignupPage from './components/auth/SignupPage';
-import { getFirestore, doc, updateDoc, Timestamp, getDoc } from 'firebase/firestore';
-import { app } from './firebaseConfig';
-
-const db = getFirestore(app);
-
-const isTimestampToday = (timestamp: Timestamp | null): boolean => {
-  if (!timestamp) return false;
-  const dateFromTimestamp = timestamp.toDate();
-  const today = new Date();
-  return (
-    dateFromTimestamp.getFullYear() === today.getFullYear() &&
-    dateFromTimestamp.getMonth() === today.getMonth() &&
-    dateFromTimestamp.getDate() === today.getDate()
-  );
-};
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { generatePixelArtImage } from '../services/geminiService.ts';
+import { useAuth } from './contexts/AuthContext.tsx';
+import LoginPage from './components/auth/LoginPage.tsx';
 
 const LoadingSpinner: React.FC = () => (
   <div className="flex flex-col items-center justify-center space-y-2">
@@ -49,12 +33,12 @@ const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const ImagePlaceholder: React.FC = () => (
-  <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 bg-[#1a1a2e] p-6 text-center min-h-[300px] md:min-h-0">
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+  <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 bg-[#1a1a2e] p-8 text-center min-h-[300px] md:min-h-[400px] rounded-lg">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>
-    <p className="text-gray-500 text-sm">Your masterpiece awaits!</p>
-    <p className="text-xs text-gray-600 mt-1">Describe your vision and click "Forge Pixel Art!"</p>
+    <h3 className="text-xl text-gray-300 mb-2">Your masterpiece awaits!</h3>
+    <p className="text-sm text-gray-500 px-4">Describe your vision on the left and click "Forge Pixel Art!"</p>
   </div>
 );
 
@@ -68,14 +52,21 @@ const ASPECT_RATIOS = [
 
 const App: React.FC = () => {
   const { currentUser, loading: authLoading, error: authError, logout, refreshUserQuota } = useAuth();
-  const [showLoginPage, setShowLoginPage] = useState<boolean>(true);
-
   const [prompt, setPrompt] = useState<string>('');
   const [selectedRatio, setSelectedRatio] = useState<string>(ASPECT_RATIOS[0].value);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false); // Image generation loading
   const [appError, setAppError] = useState<string | null>(null); // Specific app errors
   const imageRef = useRef<HTMLImageElement>(null);
+
+  // Add a state to explicitly track if the initial auth check is complete
+  const [initialAuthCheckComplete, setInitialAuthCheckComplete] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!authLoading) {
+      setInitialAuthCheckComplete(true);
+    }
+  }, [authLoading]);
 
   useEffect(() => {
     if (currentUser?.uid) { // check for uid to be more specific
@@ -98,46 +89,25 @@ const App: React.FC = () => {
       return;
     }
     if (!currentUser) {
-      setAppError("You must be logged in to generate images."); // Should ideally not happen if UI is correct
+      setAppError("You must be logged in to generate images.");
       return;
     }
 
     setIsLoading(true);
-    setAppError(null); // Clear previous app-specific errors at the start of a new attempt
-
-    const userDocRef = doc(db, 'users', currentUser.uid);
+    setAppError(null);
 
     try {
       if (currentUser.email === 'daruokta@gmail.com') {
-        const result = await generatePixelArtImage(prompt, selectedRatio);
+        const result = await generatePixelArtImage(prompt, selectedRatio); // Use selectedRatio
         setGeneratedImage(result.imageDataUrl);
-        // No need to call setIsLoading(false) here, it's in finally
-        return; // Bypass quota logic for special user
+        setIsLoading(false);
+        return;
       }
 
-      const userDocSnap = await getDoc(userDocRef);
-      if (!userDocSnap.exists()) {
-          setAppError("Your user profile was not found in the database. Please try logging out and in again.");
-          // No need to call setIsLoading(false) here, it's in finally
-          return;
-      }
-
-      let { imageQuota, lastGeneratedDate } = userDocSnap.data() as { imageQuota: number, lastGeneratedDate: Timestamp | null };
-
-      // Check for daily reset if not already handled by AuthContext or if generation is first of the day
-      if (lastGeneratedDate && !isTimestampToday(lastGeneratedDate)) {
-        imageQuota = 5;
-      }
-
-      if (imageQuota > 0) {
-        const result = await generatePixelArtImage(prompt, selectedRatio);
+      if (currentUser.imageQuota > 0) {
+        const result = await generatePixelArtImage(prompt, selectedRatio); // Use selectedRatio
         setGeneratedImage(result.imageDataUrl);
-
-        await updateDoc(userDocRef, {
-          imageQuota: imageQuota - 1,
-          lastGeneratedDate: Timestamp.now()
-        });
-        await refreshUserQuota(); // Refresh AuthContext state
+        refreshUserQuota();
       } else {
         setAppError("You have reached your daily image generation limit (5 images). Please try again tomorrow.");
         setGeneratedImage(null);
@@ -161,9 +131,9 @@ const App: React.FC = () => {
       }
       setGeneratedImage(null);
     } finally {
-      setIsLoading(false); // Ensure loading is always reset
+      setIsLoading(false);
     }
-  }, [prompt, selectedRatio, currentUser, refreshUserQuota]);
+  }, [prompt, selectedRatio, currentUser, refreshUserQuota]); // Added selectedRatio to dependencies
 
   const handleDownload = useCallback((format: 'png' | 'jpeg') => {
     if (!generatedImage) return;
@@ -219,79 +189,70 @@ const App: React.FC = () => {
   // Show global auth loading spinner ONLY if not yet authenticated (no currentUser)
   // Once currentUser is set, AuthProvider's loading state might still change (e.g. during quota refresh)
   // but we don't want to overlay the whole app.
-  if (authLoading && !currentUser) {
+  if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-[#0f0f1b] text-[#e0e0e0] flex flex-col items-center justify-center p-4 font-press-start">
         <LoadingSpinner />
-        <p className="text-[#f0a500] text-sm mt-2">Initializing...</p>
+        <p className="mt-4 text-lg">Loading Authentication...</p>
       </div>
     );
   }
 
-  if (!currentUser) {
-    // LoginPage and SignupPage internally use useAuth() and can display authError.
-    // However, if there's a persistent authError (e.g. from AuthContext's onAuthStateChanged issues),
-    // displaying it here can be a fallback.
+  // Wait for the initial auth check to complete before deciding to show login/signup or app
+  if (!initialAuthCheckComplete) {
     return (
-        <>
-            {showLoginPage ?
-                <LoginPage /> :
-                <SignupPage />
-            }
-            {/* Global/fallback auth error display if not handled by login/signup pages */}
-            {authError && (
-                 <div className="fixed top-4 left-1/2 -translate-x-1/2 w-full max-w-md z-20 p-2">
-                    <ErrorMessage message={`Authentication Error: ${authError}`} />
-                 </div>
-            )}
-            <div className="fixed bottom-4 right-4 text-center z-10">
-                <button
-                    onClick={() => { setAppError(null); setShowLoginPage(!showLoginPage); }}
-                    className="text-sm text-[#f0a500] hover:underline p-2 bg-[#2a2a3e] rounded shadow-lg"
-                >
-                    {showLoginPage ? "Need an account? Sign Up" : "Already have an account? Login"}
-                </button>
-            </div>
-        </>
-    );
+      <div className="min-h-screen bg-[#0f0f1b] text-[#e0e0e0] flex flex-col items-center justify-center p-4 font-press-start">
+        <LoadingSpinner />
+        <p className="mt-4 text-lg">Initializing...</p>
+      </div>
+    ); // Or some other placeholder
+  }
+
+  if (!currentUser) {
+    return <LoginPage />; // Removed onSwitchToSignup prop
   }
 
   // Authenticated View
   return (
-    <div className="min-h-screen bg-[#1a1a2e] flex flex-col items-center justify-center p-4 selection:bg-[#f0a500] selection:text-[#1a1a2e]">
-      <div className="w-full md:max-w-4xl lg:max-w-5xl bg-[#2a2a3e] p-6 md:p-8 shadow-2xl border-4 border-[#0f0f1a] md:flex md:gap-6 lg:gap-8">
-        <div className="md:w-2/5 flex flex-col">
-          <header className="text-center mb-6">
-            <div className="flex justify-between items-center mb-1">
+    <>
+      <div className="min-h-screen bg-gray-900 text-white flex flex-col md:flex-row items-start p-8 md:p-12 gap-8 md:gap-12 justify-center">
+        {/* Left Column: Controls */}
+        <div className="w-full md:w-2/5 max-w-xl space-y-6"> {/* Added space-y-6 for consistent vertical spacing */}
+          <header className="text-center"> {/* Removed mb-6, handled by parent space-y */}
+            <div className="flex justify-between items-center mb-3"> {/* Increased mb-1 to mb-3 */}
                 <p className="text-xs text-gray-400 truncate" title={currentUser.email || undefined}>Logged in as: {currentUser.email}</p>
                 <button
+                    type="button"
                     onClick={() => { setAppError(null); logout(); }}
                     className="text-xs text-[#f0a500] hover:underline"
-                    disabled={isLoading} // Disable logout if image generation is in progress
+                    disabled={isLoading}
                 >
                     Logout
                 </button>
             </div>
-            <div className="text-xs text-gray-500 mb-2 h-4">
+            <div className="text-xs text-gray-500 mb-4 h-auto"> {/* Increased mb-2 to mb-4, h-4 to h-auto */}
               {currentUser.email === 'daruokta@gmail.com' ? (
                 <p className="text-green-400">Unlimited Image Generations</p>
               ) : (
                 <p>Images remaining today: {currentUser.imageQuota ?? 'Loading...'}</p>
               )}
             </div>
-            <h1 className="text-3xl md:text-3xl font-bold text-[#f0a500] tracking-wider">
+            <h1 className="text-3xl md:text-3xl font-bold text-[#f0a500] tracking-wider mb-1"> {/* Added mb-1 */}
               Pixel Art<span className="text-[#e0e0e0]">Forge</span>
             </h1>
-            <p className="text-xs text-gray-400 mt-2">Craft 8-bit wonders with your words!</p>
+            <p className="text-xs text-gray-400 mt-1">Craft 8-bit wonders with your words!</p> {/* Adjusted mt-2 to mt-1 */}
           </header>
 
-          {/* Display App-specific errors first, then fallback to general auth errors if no appError */}
-          {appError && <ErrorMessage message={appError} />}
-          {!appError && authError && <ErrorMessage message={`Notice: ${authError}`} />}
+          {/* Wrapped error messages for spacing and conditional rendering */}
+          {(appError || authError) && (
+            <div className="my-2"> {/* Adjusted margin for error messages */}
+              {appError && <ErrorMessage message={appError} />}
+              {!appError && authError && <ErrorMessage message={`Notice: ${authError}`} />}
+            </div>
+          )}
 
-
-          <div className="mb-5">
-            <label htmlFor="prompt" className="block text-sm text-gray-300 mb-2">
+          <div className="space-y-2"> {/* Removed mb-5, parent space-y-6 handles it. Added internal space-y-2 */}
+            <label htmlFor="prompt" className="block text-sm text-gray-300"> {/* Removed mb-2 */}
               Describe your vision:
             </label>
             <textarea
@@ -306,33 +267,34 @@ const App: React.FC = () => {
             />
           </div>
 
-          <div className="mb-5">
-            <label className="block text-sm text-gray-300 mb-2">Aspect Ratio:</label>
-            <div className="flex flex-wrap gap-2 items-center">
+          <div className="space-y-2"> {/* Removed mb-5, parent space-y-6 handles it. Added internal space-y-2 */}
+            <label className="block text-sm text-gray-300">Select Aspect Ratio:</label> {/* Removed mb-2 */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {ASPECT_RATIOS.map((ratio) => (
                 <button
                   key={ratio.value}
-                  onClick={() => { setSelectedRatio(ratio.value); setAppError(null); }}
+                  type="button" // Ensure type is explicitly button
+                  onClick={() => setSelectedRatio(ratio.value)}
+                  className={`p-2 text-xs rounded-md transition-all duration-150 ease-in-out 
+                    ${selectedRatio === ratio.value 
+                      ? 'bg-purple-600 text-white ring-2 ring-purple-400' 
+                      : 'bg-[#1a1a2e] hover:bg-purple-500 hover:text-white'}
+                    disabled:opacity-50 disabled:cursor-not-allowed`}
                   disabled={isLoading}
-                  className={`px-3 py-2 border-2 text-xs
-                              ${selectedRatio === ratio.value ? 'bg-[#f0a500] text-[#1a1a2e] border-[#f0a500]' : 'bg-[#1a1a2e] text-gray-300 border-[#0f0f1a] hover:border-[#f0a500] hover:text-[#f0a500]'}
-                              disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 ease-in-out`}
-                  aria-pressed={selectedRatio === ratio.value}
-                  aria-label={`Aspect ratio ${ratio.label}`}
+                  aria-pressed={selectedRatio === ratio.value ? "true" : "false"} // Corrected aria-pressed
                 >
                   {ratio.label}
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-400 mt-2">
-              (Note: The AI will attempt to generate an image with this aspect ratio.)
-            </p>
           </div>
 
           <button
+            type="button"
             onClick={handleGenerateImage}
             disabled={isLoading || (currentUser.email !== 'daruokta@gmail.com' && currentUser.imageQuota === 0)}
-            className="w-full bg-[#f0a500] text-[#1a1a2e] py-3 px-4 text-base font-bold hover:bg-yellow-400 transition-colors duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 group mt-auto"
+            {...(isLoading ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
+            className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-md text-lg font-semibold shadow-md transition-all duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             aria-label="Generate Pixel Art"
           >
             {isLoading && !generatedImage ? (
@@ -340,22 +302,23 @@ const App: React.FC = () => {
             ) : (
               <>
                 <MagicWandIcon className={`${isLoading ? 'animate-pulse' : 'group-hover:animate-ping'} transition-transform duration-300`} />
-                <span>{isLoading ? 'Updating Art...' : 'Forge Pixel Art!'}</span>
+                <span className="ml-2">Forge Pixel Art!</span>
               </>
             )}
           </button>
            {currentUser.email !== 'daruokta@gmail.com' && currentUser.imageQuota === 0 && !isLoading && (
-            <p className="text-xs text-yellow-500 text-center mt-2">
+            <p className="text-xs text-yellow-500 text-center mt-3"> {/* Increased mt-2 to mt-3 */}
                 You've used all your generations for today. Come back tomorrow!
             </p>
           )}
         </div>
 
-        <div className="md:w-3/5 mt-8 md:mt-0 flex flex-col items-center justify-center">
+        {/* Right Column: Image Display */}
+        <div className="w-full md:w-3/5 max-w-2xl flex flex-col items-center justify-start md:pt-0"> {/* Removed mt-8 for mobile */}
           {generatedImage ? (
-            <div className="w-full p-1 border-2 border-[#0f0f1a] bg-[#1a1a2e] flex flex-col items-center">
-              <h2 className="text-lg text-center text-[#f0a500] my-3">Your Masterpiece!</h2>
-              <div className="flex justify-center items-center bg-black bg-opacity-20 p-2 w-full max-h-[45vh] md:max-h-[55vh] lg:max-h-[calc(100vh-280px)] overflow-hidden">
+            <div className="w-full p-2 border-2 border-[#0f0f1a] bg-[#1a1a2e] flex flex-col items-center sticky top-10 rounded-lg"> {/* Added p-2, rounded-lg */}
+              <h2 className="text-lg text-center text-[#f0a500] my-4">Your Masterpiece!</h2>
+              <div className="flex justify-center items-center bg-black bg-opacity-20 p-3 w-full max-h-[60vh] md:max-h-[70vh] overflow-hidden rounded"> {/* Added p-3, rounded */}
                 <img
                   ref={imageRef}
                   src={generatedImage}
@@ -364,46 +327,47 @@ const App: React.FC = () => {
                 />
               </div>
               <button
+                  type="button"
                   onClick={handleClear}
-                  className="mt-3 w-full bg-red-600 text-white py-2 px-3 text-xs hover:bg-red-700 transition-colors duration-150 ease-in-out"
+                  className="mt-4 w-full bg-red-600 text-white py-2.5 px-4 text-sm hover:bg-red-700 transition-colors duration-150 ease-in-out rounded-md" /* Adjusted styles */
                   aria-label="Clear generated image and start anew"
               >
                   Clear Image & Start Anew
               </button>
-              <div className="mt-2 w-full flex gap-2">
-                   <button
-                      onClick={() => handleDownload('png')}
-                      className="flex-1 bg-green-600 text-white py-2 px-3 text-xs hover:bg-green-700 transition-colors duration-150 ease-in-out flex items-center justify-center space-x-1"
-                      aria-label="Download image as PNG"
-                  >
-                      <DownloadIcon />
-                      <span>Download PNG</span>
-                  </button>
-                   <button
-                      onClick={() => handleDownload('jpeg')}
-                      className="flex-1 bg-green-700 text-white py-2 px-3 text-xs hover:bg-green-800 transition-colors duration-150 ease-in-out flex items-center justify-center space-x-1"
-                      aria-label="Download image as JPG"
-                  >
-                      <DownloadIcon />
-                      <span>Download JPG</span>
-                  </button>
+              <div className="mt-3 w-full flex gap-3"> {/* Increased mt-2 to mt-3, gap-2 to gap-3 */}
+                <button 
+                  onClick={() => handleDownload('png')} 
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 px-3 text-sm transition-colors duration-150 ease-in-out flex items-center justify-center gap-1.5 rounded-md" /* Adjusted styles */
+                  aria-label="Download as PNG"
+                >
+                  <DownloadIcon /> PNG
+                </button>
+                <button 
+                  onClick={() => handleDownload('jpeg')} 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-3 text-sm transition-colors duration-150 ease-in-out flex items-center justify-center gap-1.5 rounded-md" /* Adjusted styles */
+                  aria-label="Download as JPG"
+                >
+                  <DownloadIcon /> JPG
+                </button>
               </div>
             </div>
           ) : isLoading ? (
-             <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 bg-[#1a1a2e] p-6 text-center min-h-[300px] md:min-h-0">
+             <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 bg-[#1a1a2e] p-8 text-center min-h-[300px] md:min-h-[400px] sticky top-10 rounded-lg"> {/* Added p-8, rounded-lg */}
                 <LoadingSpinner />
-                <p className="text-[#f0a500] text-sm mt-3">Conjuring Pixels...</p>
+                <p className="mt-3 text-sm text-gray-400">Forging your vision...</p> {/* Increased mt-2 to mt-3 */}
              </div>
           ) : (
-            <ImagePlaceholder />
+            <div className="sticky top-10 w-full">
+              <ImagePlaceholder />
+            </div>
           )}
         </div>
       </div>
-      <footer className="text-center text-xs text-gray-500 mt-6 pb-4">
-        <p>Powered by Google Gemini & Imagen. Font: Press Start 2P.</p>
+      <footer className="text-center text-xs text-gray-500 py-8"> {/* Changed mt-6 pb-4 to py-8 */}
+        <p className="mb-1">Powered by Google Gemini & Imagen. Font: Press Start 2P.</p> {/* Added mb-1 */}
         <p>Ensure your <code className="bg-gray-700 px-1 rounded-sm">API_KEY</code> is set in your environment.</p>
       </footer>
-    </div>
+    </>
   );
 };
 

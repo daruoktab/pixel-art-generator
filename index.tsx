@@ -1,7 +1,7 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import App from './src/App.tsx'; // Changed to import from src and added .tsx
+import { AuthProvider } from './src/contexts/AuthContext.tsx'; // Import AuthProvider and added .tsx
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -11,6 +11,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <AuthProvider> {/* Added AuthProvider */}
+      <App />
+    </AuthProvider> {/* Added AuthProvider */}
   </React.StrictMode>
 );
