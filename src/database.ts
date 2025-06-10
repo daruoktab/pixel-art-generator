@@ -26,7 +26,13 @@ export async function initDb(): Promise<Database> {
   }
 
   const SQL = await initSqlJs({
-    locateFile: file => `/${file}` // Assuming sql-wasm.wasm will be in the public root
+    locateFile: file => {
+      // Ensure BASE_URL ends with a slash if it's not just '/'
+      const baseUrl = import.meta.env.BASE_URL;
+      const path = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+      console.log(`AuthContext: locateFile path for ${file}: ${path}${file}`);
+      return `${path}${file}`;
+    }
   });
 
   try {
