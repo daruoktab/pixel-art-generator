@@ -9,7 +9,7 @@ This contains everything you need to run your app locally.
 *   Generate unique pixel art based on text prompts.
 *   User authentication via Google Sign-In.
 *   Daily image generation limit: 5 images per day for registered users.
-*   Unlimited image generations for the admin user (`daruokta@gmail.com`).
+*   Unlimited image generations for a designated admin user.
 *   Persistent quota tracking: Your daily count is remembered in your browser.
 *   Simple and intuitive user interface.
 *   Powered by Google's Gemini AI.
@@ -71,7 +71,7 @@ This contains everything you need to run your app locally.
 
 *   Upon logging in, users are allocated a quota of 5 image generations per day.
 *   This quota resets daily (based on the user's local system time when they next use the app).
-*   The email `daruokta@gmail.com` has unlimited generation privileges.
+*   A designated admin email has unlimited generation privileges (details are kept locally for security).
 
 To keep track of your daily image generations, the application uses a small SQLite database that runs directly in your web browser (thanks to `sql.js`). This database, including your email, the date of your last generation, and the number of images you've generated today, is stored locally in your browser's `localStorage`.
 
