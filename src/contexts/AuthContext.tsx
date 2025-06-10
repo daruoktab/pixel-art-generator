@@ -133,9 +133,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 newQuota = DEFAULT_QUOTA - (existingUser.images_generated_today as number);
               } else {
                 // Different day, reset usage in DB
-                console.log(`AuthContext: Different day for user ${userEmail}. Resetting usage.`);
-                dbInstance.run("UPDATE user_image_usage SET images_generated_today = 0, last_generation_date = ? WHERE email = ?", [currentDate, userEmail]);
-                await saveDb(dbInstance); // Save DB after update
+                try {
+                  console.log(`AuthContext: Different day for user ${userEmail}. Resetting usage.`);
+                  dbInstance.run("UPDATE user_image_usage SET images_generated_today = 0, last_generation_date = ? WHERE email = ?", [currentDate, userEmail]);
+                  await saveDb(dbInstance); // Save DB after update
+                } catch (e: any) {
+                  console.error("AuthContext: Error saving DB after daily reset:", e);
+                  setDbError(`Failed to save session data after daily reset. Details: ${e.message}`);
+                  // Quota calculation will proceed with in-memory reset, but it won't be persisted if saveDb failed.
+                }
               }
               setCurrentUser({
                 uid: firebaseUser.uid,
@@ -143,9 +149,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 imageQuota: Math.max(0, newQuota),
               });
             } else { // User does not exist in DB
-              console.log(`AuthContext: User ${userEmail} not found in DB. Creating new record.`);
-              dbInstance.run("INSERT INTO user_image_usage (email, last_generation_date, images_generated_today) VALUES (?, ?, ?)", [userEmail, currentDate, 0]);
-              await saveDb(dbInstance); // Save DB after insert
+              try {
+                console.log(`AuthContext: User ${userEmail} not found in DB. Creating new record.`);
+                dbInstance.run("INSERT INTO user_image_usage (email, last_generation_date, images_generated_today) VALUES (?, ?, ?)", [userEmail, currentDate, 0]);
+                await saveDb(dbInstance); // Save DB after insert
+              } catch (e: any) {
+                console.error("AuthContext: Error saving DB for new user record:", e);
+                setDbError(`Failed to save new user session data. Details: ${e.message}`);
+                 // User will still get default quota for the session.
+              }
               setCurrentUser({
                 uid: firebaseUser.uid,
                 email: userEmail,
@@ -304,38 +316,45 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (userEmail && userEmail !== specialEmail) {
       try {
         const currentDate = getCurrentDateString();
-        // It's possible the user was created on a previous day and this is their first action today.
-        // Ensure the record reflects today's date and then increment.
-        // Using an UPSERT-like logic or checking first.
-        // For simplicity, we assume onAuthStateChanged has already set up today's record or reset it.
-        // So, we directly increment.
 
-        // Check if the user's last generation date is today. If not, reset count before incrementing.
-        const userCheckStmt = dbInstance.prepare("SELECT last_generation_date, images_generated_today FROM user_image_usage WHERE email = :email");
+        const userCheckStmt = dbInstance.prepare("SELECT email, last_generation_date, images_generated_today FROM user_image_usage WHERE email = :email");
         const userUsage = userCheckStmt.getAsObject({ ':email': userEmail });
         userCheckStmt.free();
 
-        if (userUsage.email) { // userUsage.email will be populated if found
-            if (userUsage.last_generation_date === currentDate) {
-                dbInstance.run("UPDATE user_image_usage SET images_generated_today = images_generated_today + 1, last_generation_date = ? WHERE email = ?", [currentDate, userEmail]);
-                console.log(`AuthContext: Incremented images_generated_today for ${userEmail} on ${currentDate}.`);
-            } else {
-                // First action of a new day for this user
-                dbInstance.run("UPDATE user_image_usage SET images_generated_today = 1, last_generation_date = ? WHERE email = ?", [currentDate, userEmail]);
-                console.log(`AuthContext: First image for ${userEmail} on new day ${currentDate}. Set images_generated_today to 1.`);
-            }
-        } else {
-            // This case should ideally not happen if onAuthStateChanged ran correctly.
-            // But as a fallback, create the record.
-            dbInstance.run("INSERT INTO user_image_usage (email, last_generation_date, images_generated_today) VALUES (?, ?, ?)", [userEmail, currentDate, 1]);
-            console.warn(`AuthContext: User ${userEmail} not found during decrement. Created new DB record.`);
+        // Check if any properties exist on userUsage; if it's an empty object, or email is undefined, the user wasn't found.
+        if (userUsage.email === undefined) {
+            console.error(`CRITICAL: User ${userEmail} not found in DB during decrementQuota. This should not happen if onAuthStateChanged is working correctly.`);
+            setDbError(`Critical error: User data inconsistency detected. Cannot update image quota. Please try refreshing the page or logging out and back in.`);
+            // Revert optimistic update as DB operation will not proceed
+            setCurrentUser(prevUser => prevUser ? { ...prevUser, imageQuota: prevUser.imageQuota + 1 } : null);
+            return; // Stop further processing in decrementQuota
         }
-        await saveDb(dbInstance); // Save DB after successful update/insert
-      } catch (e) {
-        console.error("AuthContext: Failed to update user quota in DB:", e);
-        setError("Failed to save usage data. Your displayed quota might be incorrect.");
-        // Potentially revert optimistic update or re-fetch from DB
-        // For now, we'll leave the optimistic update and show an error.
+
+        // Proceed with UPDATE logic, as user was found
+        if (userUsage.last_generation_date === currentDate) {
+            dbInstance.run("UPDATE user_image_usage SET images_generated_today = images_generated_today + 1, last_generation_date = ? WHERE email = ?", [currentDate, userEmail]);
+            console.log(`AuthContext: Incremented images_generated_today for ${userEmail} on ${currentDate}.`);
+        } else {
+            // First action of a new day for this user
+            dbInstance.run("UPDATE user_image_usage SET images_generated_today = 1, last_generation_date = ? WHERE email = ?", [currentDate, userEmail]);
+            console.log(`AuthContext: First image for ${userEmail} on new day ${currentDate}. Set images_generated_today to 1.`);
+        }
+
+        // Attempt to save the DB after successful operation
+        try {
+          await saveDb(dbInstance);
+        } catch (e: any) {
+          console.error("AuthContext: Error saving DB after decrementing quota:", e);
+          setDbError(`Failed to save image generation attempt. Your quota might not be up-to-date for your next session. Details: ${e.message}`);
+          // Note: The primary DB operation succeeded, but persistence failed.
+          // The in-memory state (optimistic update) is consistent with what should have been persisted.
+        }
+
+      } catch (e: any) {
+        console.error("AuthContext: Failed to update user quota in DB (operation error):", e);
+        setDbError(`Failed to update usage data in DB. Details: ${e.message || 'Unknown DB error'}`);
+        // Revert optimistic update because the DB operation itself failed.
+        setCurrentUser(prevUser => prevUser ? { ...prevUser, imageQuota: prevUser.imageQuota + 1 } : null);
       }
     } else if (userEmail === specialEmail) {
       console.log("AuthContext: Special user quota decrement skipped for DB update (or handled differently).");

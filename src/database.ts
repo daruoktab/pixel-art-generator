@@ -5,8 +5,8 @@ let db: Database | null = null;
 
 export async function saveDb(dbInstance: Database | null): Promise<void> {
   if (!dbInstance) {
-    console.warn("saveDb: No database instance provided.");
-    return;
+    console.error("saveDb: Called with null dbInstance. Cannot save."); // Changed from warn to error
+    throw new Error("saveDb: Called with null dbInstance. Cannot save.");
   }
   try {
     const binaryArray = dbInstance.export();
@@ -14,9 +14,9 @@ export async function saveDb(dbInstance: Database | null): Promise<void> {
     const array = Array.from(binaryArray);
     localStorage.setItem(DB_STORAGE_KEY, JSON.stringify(array));
     console.log('Database saved to localStorage.');
-  } catch (error) {
+  } catch (error: any) { // Added :any to access error.message
     console.error('Failed to save database to localStorage:', error);
-    // Potentially notify user or implement more robust error handling/fallback
+    throw new Error(`Failed to save database to localStorage: ${error.message}`);
   }
 }
 
