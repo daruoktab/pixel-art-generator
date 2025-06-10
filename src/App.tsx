@@ -51,7 +51,7 @@ const ASPECT_RATIOS = [
 ];
 
 const App: React.FC = () => {
-  const { currentUser, loading: authLoading, error: authError, logout, refreshUserQuota } = useAuth();
+  const { currentUser, loading: authLoading, error: authError, logout, decrementQuota } = useAuth();
   const [prompt, setPrompt] = useState<string>('');
   const [selectedRatio, setSelectedRatio] = useState<string>(ASPECT_RATIOS[0].value);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -69,12 +69,9 @@ const App: React.FC = () => {
   }, [authLoading]);
 
   useEffect(() => {
-    if (currentUser?.uid) { // check for uid to be more specific
-      refreshUserQuota();
-    }
-    // Clear app-specific errors when auth state (currentUser) might change
+    // Quota is now handled by AuthContext on login/state change
     setAppError(null);
-  }, [currentUser?.uid, refreshUserQuota]); // Added refreshUserQuota to dependencies
+  }, [currentUser?.uid]);
 
   // Display auth errors from context if they exist, prioritizing appError if both are set
   useEffect(() => {
@@ -107,7 +104,7 @@ const App: React.FC = () => {
       if (currentUser.imageQuota > 0) {
         const result = await generatePixelArtImage(prompt, selectedRatio); // Use selectedRatio
         setGeneratedImage(result.imageDataUrl);
-        refreshUserQuota();
+        await decrementQuota();
       } else {
         setAppError("You have reached your daily image generation limit (5 images). Please try again tomorrow.");
         setGeneratedImage(null);
@@ -133,7 +130,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [prompt, selectedRatio, currentUser, refreshUserQuota]); // Added selectedRatio to dependencies
+  }, [prompt, selectedRatio, currentUser, decrementQuota]); // Added selectedRatio to dependencies
 
   const handleDownload = useCallback((format: 'png' | 'jpeg') => {
     if (!generatedImage) return;

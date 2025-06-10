@@ -7,6 +7,10 @@ This contains everything you need to run your app locally.
 ## ✨ Features
 
 *   Generate unique pixel art based on text prompts.
+*   User authentication via Google Sign-In.
+*   Daily image generation limit: 5 images per day for registered users.
+*   Unlimited image generations for the admin user (`daruokta@gmail.com`).
+*   Persistent quota tracking: Your daily count is remembered in your browser.
 *   Simple and intuitive user interface.
 *   Powered by Google's Gemini AI.
 
@@ -15,7 +19,9 @@ This contains everything you need to run your app locally.
 *   React
 *   TypeScript
 *   Vite
-*   Tailwind CSS (via CDN for development, consider integrating for production)
+*   Tailwind CSS
+*   Firebase Authentication (for Google Sign-In)
+*   `sql.js` (for client-side SQLite database)
 *   Google Gemini API
 
 ## 🛠️ Setup and Installation
@@ -55,9 +61,23 @@ This contains everything you need to run your app locally.
 ## 🎮 Usage
 
 1.  Open the application in your browser (usually `http://localhost:5173` when running locally, or the GitHub Pages URL when deployed).
-2.  Enter a text prompt describing the pixel art you want to generate (e.g., "a cute cat", "a futuristic cityscape").
-3.  Click the "Generate" button.
-4.  View the generated pixel art!
+2.  Log in using your Google account.
+3.  Your remaining images for the day will be displayed.
+4.  Enter a text prompt describing the pixel art you want to generate (e.g., "a cute cat", "a futuristic cityscape").
+5.  Click the "Generate" button.
+6.  View the generated pixel art!
+
+## Image Quota and Data Persistence
+
+*   Upon logging in, users are allocated a quota of 5 image generations per day.
+*   This quota resets daily (based on the user's local system time when they next use the app).
+*   The email `daruokta@gmail.com` has unlimited generation privileges.
+
+To keep track of your daily image generations, the application uses a small SQLite database that runs directly in your web browser (thanks to `sql.js`). This database, including your email, the date of your last generation, and the number of images you've generated today, is stored locally in your browser's `localStorage`.
+
+**Important Limitation:** Because the data is stored in your browser:
+*   If you clear your browser's cache/data (specifically `localStorage` for this site), your quota information will be lost, and it will reset as if you are a new user for the day.
+*   Your quota and usage history are specific to the browser you use. Switching to a different browser or device will not sync this information; each browser will have its own separate quota tracking.
 
 ## Deployment
 
@@ -101,6 +121,7 @@ This project is configured for deployment to GitHub Pages.
     npm run deploy
     ```
     This will push the contents of your `dist` folder to a `gh-pages` branch on your repository, which will then be served by GitHub Pages.
+    (The client-side database and quota system are fully compatible with this static deployment model.)
 
 ## 📄 License
 
