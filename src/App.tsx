@@ -33,7 +33,7 @@ const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 const ImagePlaceholder: React.FC = () => (
-  <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 bg-[#1a1a2e] p-8 text-center min-h-[300px] md:min-h-[400px] rounded-lg">
+  <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 bg-[#1a1a2e] p-8 text-center min-h-[250px] sm:min-h-[300px] md:min-h-[350px] lg:min-h-[400px] rounded-lg">
     <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
       <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
     </svg>
@@ -215,7 +215,7 @@ const App: React.FC = () => {
   // Authenticated View
   return (
     <>
-      <div className="min-h-screen bg-gray-900 text-white flex flex-col md:flex-row items-start p-8 md:p-12 gap-8 md:gap-12 justify-center">
+      <div className="min-h-screen bg-gray-900 text-white flex flex-col md:flex-row items-start p-4 sm:p-6 md:p-8 lg:p-10 xl:p-12 gap-4 sm:gap-6 md:gap-8 lg:gap-10 xl:gap-12 justify-center">
         {/* Left Column: Controls */}
         <div className="w-full md:w-2/5 max-w-xl space-y-6"> {/* Added space-y-6 for consistent vertical spacing */}
           <header className="text-center"> {/* Removed mb-6, handled by parent space-y */}
@@ -237,7 +237,7 @@ const App: React.FC = () => {
                 <p>Images remaining today: {currentUser.imageQuota ?? 'Loading...'}</p>
               )}
             </div>
-            <h1 className="text-3xl md:text-3xl font-bold text-[#f0a500] tracking-wider mb-1"> {/* Added mb-1 */}
+            <h1 className="text-2xl sm:text-3xl font-bold text-[#f0a500] tracking-wider mb-1"> {/* Added mb-1 */}
               Pixel Art<span className="text-[#e0e0e0]">Forge</span>
             </h1>
             <p className="text-xs text-gray-400 mt-1">Craft 8-bit wonders with your words!</p> {/* Adjusted mt-2 to mt-1 */}
@@ -269,13 +269,13 @@ const App: React.FC = () => {
 
           <div className="space-y-2"> {/* Removed mb-5, parent space-y-6 handles it. Added internal space-y-2 */}
             <label className="block text-sm text-gray-300">Select Aspect Ratio:</label> {/* Removed mb-2 */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 sm:gap-2">
               {ASPECT_RATIOS.map((ratio) => (
                 <button
                   key={ratio.value}
                   type="button" // Ensure type is explicitly button
                   onClick={() => setSelectedRatio(ratio.value)}
-                  className={`p-2 text-xs rounded-md transition-all duration-150 ease-in-out 
+                  className={`px-2 py-1.5 sm:px-2.5 sm:py-2 text-[10px] sm:text-xs rounded-md transition-all duration-150 ease-in-out
                     ${selectedRatio === ratio.value 
                       ? 'bg-purple-600 text-white ring-2 ring-purple-400' 
                       : 'bg-[#1a1a2e] hover:bg-purple-500 hover:text-white'}
@@ -294,7 +294,7 @@ const App: React.FC = () => {
             onClick={handleGenerateImage}
             disabled={isLoading || (currentUser.email !== 'daruokta@gmail.com' && currentUser.imageQuota === 0)}
             {...(isLoading ? { 'aria-pressed': 'true' } : { 'aria-pressed': 'false' })}
-            className="w-full px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-md text-lg font-semibold shadow-md transition-all duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-full px-4 py-2 text-base sm:px-6 sm:py-3 sm:text-lg bg-purple-600 hover:bg-purple-700 rounded-md font-semibold shadow-md transition-all duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             aria-label="Generate Pixel Art"
           >
             {isLoading && !generatedImage ? (
@@ -316,9 +316,9 @@ const App: React.FC = () => {
         {/* Right Column: Image Display */}
         <div className="w-full md:w-3/5 max-w-2xl flex flex-col items-center justify-start md:pt-0"> {/* Removed mt-8 for mobile */}
           {generatedImage ? (
-            <div className="w-full p-2 border-2 border-[#0f0f1a] bg-[#1a1a2e] flex flex-col items-center sticky top-10 rounded-lg"> {/* Added p-2, rounded-lg */}
+            <div className="w-full p-2 sm:p-3 md:p-4 border-2 border-[#0f0f1a] bg-[#1a1a2e] flex flex-col items-center sticky top-10 rounded-lg"> {/* Added p-2, rounded-lg */}
               <h2 className="text-lg text-center text-[#f0a500] my-4">Your Masterpiece!</h2>
-              <div className="flex justify-center items-center bg-black bg-opacity-20 p-3 w-full max-h-[60vh] md:max-h-[70vh] overflow-hidden rounded"> {/* Added p-3, rounded */}
+              <div className="flex justify-center items-center bg-black bg-opacity-20 p-2 sm:p-3 w-full max-h-[60vh] md:max-h-[70vh] overflow-hidden rounded"> {/* Added p-3, rounded */}
                 <img
                   ref={imageRef}
                   src={generatedImage}
@@ -329,22 +329,22 @@ const App: React.FC = () => {
               <button
                   type="button"
                   onClick={handleClear}
-                  className="mt-4 w-full bg-red-600 text-white py-2.5 px-4 text-sm hover:bg-red-700 transition-colors duration-150 ease-in-out rounded-md" /* Adjusted styles */
+                  className="mt-4 w-full bg-red-600 text-white px-3 py-2 text-xs sm:px-4 sm:py-2.5 sm:text-sm hover:bg-red-700 transition-colors duration-150 ease-in-out rounded-md" /* Adjusted styles */
                   aria-label="Clear generated image and start anew"
               >
                   Clear Image & Start Anew
               </button>
-              <div className="mt-3 w-full flex gap-3"> {/* Increased mt-2 to mt-3, gap-2 to gap-3 */}
+              <div className="mt-3 w-full flex gap-2 sm:gap-3"> {/* Increased mt-2 to mt-3, gap-2 to gap-3 */}
                 <button 
                   onClick={() => handleDownload('png')} 
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2.5 px-3 text-sm transition-colors duration-150 ease-in-out flex items-center justify-center gap-1.5 rounded-md" /* Adjusted styles */
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white px-2.5 py-2 text-xs sm:px-3 sm:py-2.5 sm:text-sm transition-colors duration-150 ease-in-out flex items-center justify-center gap-1.5 rounded-md" /* Adjusted styles */
                   aria-label="Download as PNG"
                 >
                   <DownloadIcon /> PNG
                 </button>
                 <button 
                   onClick={() => handleDownload('jpeg')} 
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-3 text-sm transition-colors duration-150 ease-in-out flex items-center justify-center gap-1.5 rounded-md" /* Adjusted styles */
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-2 text-xs sm:px-3 sm:py-2.5 sm:text-sm transition-colors duration-150 ease-in-out flex items-center justify-center gap-1.5 rounded-md" /* Adjusted styles */
                   aria-label="Download as JPG"
                 >
                   <DownloadIcon /> JPG
@@ -352,18 +352,18 @@ const App: React.FC = () => {
               </div>
             </div>
           ) : isLoading ? (
-             <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 bg-[#1a1a2e] p-8 text-center min-h-[300px] md:min-h-[400px] sticky top-10 rounded-lg"> {/* Added p-8, rounded-lg */}
+             <div className="w-full h-full flex flex-col items-center justify-center border-2 border-dashed border-gray-700 bg-[#1a1a2e] p-8 text-center min-h-[250px] sm:min-h-[300px] md:min-h-[350px] lg:min-h-[400px] sticky top-10 rounded-lg"> {/* Added p-8, rounded-lg */}
                 <LoadingSpinner />
                 <p className="mt-3 text-sm text-gray-400">Forging your vision...</p> {/* Increased mt-2 to mt-3 */}
              </div>
           ) : (
             <div className="sticky top-10 w-full">
-              <ImagePlaceholder />
+              <ImagePlaceholder /> {/* Placeholder min-height is adjusted in its own component definition if needed, or here if direct styling */}
             </div>
           )}
         </div>
       </div>
-      <footer className="text-center text-xs text-gray-500 py-8"> {/* Changed mt-6 pb-4 to py-8 */}
+      <footer className="text-center text-xs text-gray-500 py-6 sm:py-8"> {/* Changed mt-6 pb-4 to py-8 */}
         <p className="mb-1">Powered by Google Gemini & Imagen. Font: Press Start 2P.</p> {/* Added mb-1 */}
         <p>Ensure your <code className="bg-gray-700 px-1 rounded-sm">API_KEY</code> is set in your environment.</p>
       </footer>
