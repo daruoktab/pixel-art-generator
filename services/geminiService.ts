@@ -1,65 +1,74 @@
-
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { IMAGEN_MODEL_NAME } from '../constants';
-
-// Ensure API_KEY is available in the environment.
-const apiKey = process.env.API_KEY;
-
-if (!apiKey) {
-  console.error("API_KEY environment variable is not set.");
-  // Potentially throw an error or handle this state in the UI
-}
-
-const ai = new GoogleGenAI({ apiKey: apiKey || "MISSING_API_KEY" }); // Provide a fallback for type safety if needed
-
 interface GeneratedImage {
   imageDataUrl: string;
   altText: string;
 }
 
-export const generatePixelArtImage = async (prompt: string, aspectRatio: string): Promise<GeneratedImage> => {
-  if (!apiKey) {
-    throw new Error("API key is not configured. Please set the API_KEY environment variable.");
+// Determine the API endpoint based on environment
+const getApiEndpoint = (): string => {
+  // In production (GitHub Pages), use the deployed Vercel function
+  if (window.location.hostname.includes("github.io")) {
+    return "https://pixel-art-forge.vercel.app/api/generate-image";
   }
-  
-  // Prompt no longer needs to include aspect ratio as it's a direct config
+  // In development, use local Vercel dev server or relative path
+  return "/api/generate-image";
+};
+
+export const generatePixelArtImage = async (
+  prompt: string,
+  aspectRatio: string,
+): Promise<GeneratedImage> => {
   const fullPrompt = `Generate a pixel art image. The subject is: "${prompt}". Style: 8-bit retro game, detailed pixel illustration.`;
 
   try {
-    const response = await ai.models.generateImages({
-      model: IMAGEN_MODEL_NAME,
-      prompt: fullPrompt,
-      config: { 
-        numberOfImages: 1, 
-        outputMimeType: 'image/png', // PNG is generally good for pixel art
-        aspectRatio: aspectRatio // Use the direct API parameter
+    const apiEndpoint = getApiEndpoint();
+
+    const response = await fetch(apiEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        prompt: fullPrompt,
+        aspectRatio: aspectRatio,
+      }),
     });
 
-    if (response.generatedImages && response.generatedImages.length > 0) {
-      const image = response.generatedImages[0];
-      if (image.image?.imageBytes) {
-        const base64ImageBytes = image.image.imageBytes;
-        const imageDataUrl = `data:image/png;base64,${base64ImageBytes}`;
-        return { imageDataUrl, altText: `Pixel art for: ${prompt} (intended aspect ratio: ${aspectRatio})` };
-      } else {
-        throw new Error("Image data is missing in the API response.");
+    if (!response.ok) {
+      const errorData = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
+
+      if (response.status === 429) {
+        throw new Error(
+          "API quota exceeded. Please try again later or check your quota limits.",
+        );
       }
+
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(
+          "API authentication error. Please contact the site administrator.",
+        );
+      }
+
+      throw new Error(
+        `got status: ${response.status} . ${JSON.stringify(errorData)}`,
+      );
+    }
+
+    const data = await response.json();
+
+    if (data.imageUrl) {
+      return {
+        imageDataUrl: data.imageUrl,
+        altText: `Pixel art for: ${prompt} (aspect ratio: ${aspectRatio})`,
+      };
     } else {
-      // This typically means the prompt was filtered or the model couldn't fulfill the request.
-      throw new Error("The AI couldn't generate an image for this prompt. This might be due to safety filters or the specific nature of your request. Please try rephrasing or using a different prompt.");
+      throw new Error("No image data received from the server.");
     }
   } catch (error) {
-    console.error("Error generating image with Gemini API:", error);
+    console.error("Error generating image:", error);
     if (error instanceof Error) {
-        // Check for specific API error messages if available
-        if (error.message.includes("API key not valid")) {
-            throw new Error("Invalid API Key. Please check your API_KEY environment variable.");
-        }
-        if (error.message.toLowerCase().includes("quota") || (error as any)?.status === 429) {
-             throw new Error("API quota exceeded. Please try again later or check your quota limits.");
-        }
-         throw new Error(`Failed to generate image: ${error.message}`);
+      throw error;
     }
     throw new Error("An unknown error occurred while generating the image.");
   }

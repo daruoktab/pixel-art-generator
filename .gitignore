@@ -26,3 +26,10 @@ dist-ssr
 
 # Local sensitive notes
 ADMIN_NOTES.md
+
+# Local documentation files (keep local only)
+DEPLOYMENT.md
+UPDATE_SUMMARY.md
+VERCEL_PROTECTION_FIX.md
+
+.vercel
